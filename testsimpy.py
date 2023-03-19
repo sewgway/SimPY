@@ -10,7 +10,6 @@ class Shipyard:
     def __init__(self, env):
         self.steel = simpy.Container(env, capacity= steel_capacity, init= initial_steel)
         self.panels = simpy.Container(env, capacity= panel_capacity, init= 0)
-        self.availablewelders=
 
 
 class Welding_machine(object):
