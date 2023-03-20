@@ -10,6 +10,28 @@ initial_steel  = 0
 panel_capacity = 40
 steel_capacity = 1000
 
+class ForkliftGarage:
+    forklift_capacity = 5
+    def __init__(self,env, forklift_capacity):
+        self.forklifts = simpy.Resource(env,capacity=forklift_capacity)
+        self.carrying_capacity = 2
+        self.trans_time = 4
+    def transport(self, resource, src, tgt, amount):
+        while amount > 0:
+            if amount > self.carrying_capacity:
+                load = self.carrying_capacity
+            else:
+                load = amount
+            yield src.resource.get(load)
+            yield tgt.resource.put(load)
+            yield env.timeout(self.trans_time)
+            amount += - load
+
+
+
+
+
+
 class ImportExport_warehouse:
     def __init__(self, env):
         self.steel = simpy.Container(env, capacity= steel_capacity, init= initial_steel)
@@ -36,6 +58,9 @@ class ImportExport_warehouse:
             if self.panels.level >= panel_capacity*0.7:
                 print('[Warehouse] Export panels')
                 yield env.timeout(4)
+                # with ForkliftGarage.forklifts.request() as request:
+                #     yield request
+                #     yield env.process(ForkliftGarage.transport(ForkliftGarage, 'steel', self, ))
                 yield self.panels.get(10)
                 self.exported_panels += 1
                 print("Exported panels so far are: %d" %self.exported_panels)
