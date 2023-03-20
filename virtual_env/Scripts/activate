@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\xvb14172\OneDrive - University of Strathclyde\Desktop\Local Repos\SimPY\virtual_env"
+VIRTUAL_ENV="G:\GIT REPOS\SimPY\virtual_env"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
