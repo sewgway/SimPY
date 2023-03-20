@@ -3,6 +3,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.animation import PillowWriter
 
+print('hi')
 worker_panel = 3
 initial_steel  = 0
 panel_capacity = 40
