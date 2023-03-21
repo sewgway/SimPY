@@ -1,7 +1,9 @@
 import simpy
 import matplotlib
 import matplotlib.pyplot as plt
+import pandas as pd
 from matplotlib.animation import PillowWriter
+import tqdm
 import os 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -112,7 +114,7 @@ class FabricationHall:
             else:
                 yield env.timeout(1)
             
-def clock(env,A, B):
+def monitor(env,A, B, C):
     yield env.timeout(0)
     while True:
             xlist.append(env.now)
@@ -121,6 +123,11 @@ def clock(env,A, B):
             ylist3.append(B.steel.level)
             ylist4.append(B.panels.level)
             expopanels.append(A.exported_panels)
+            forklift_ut.append(C.forklifts.count)
+            item = (env.now, A.steel.level, A.panels.level, A.exported_panels, B.steel.level, B.panels.level,
+              C.forklifts.count,
+              len(C.forklifts.queue))
+            data.append(item)
             # print('Steel %d' %A.steel.level)      
             yield env.timeout(1)
 
@@ -128,8 +135,10 @@ ylist1=[]
 ylist2=[]
 ylist3=[]
 ylist4=[]
+forklift_ut=[]
 expopanels=[]
 xlist=[]
+data=[]
 
 env=simpy.Environment()
 # env=simpy.rt.RealtimeEnvironment(factor=0.01, strict=False)
@@ -137,7 +146,7 @@ env=simpy.Environment()
 ImportExport_warehouse = ImportExport_warehouse(env)
 FabricationHall = FabricationHall(env)
 ForkliftGarage = ForkliftGarage(env, forklift_capacity)
-env.process(clock(env, ImportExport_warehouse, FabricationHall))
+env.process(monitor(env, ImportExport_warehouse, FabricationHall, ForkliftGarage))
 
 SIMTIME=1000
 
@@ -151,21 +160,26 @@ m, = plt.plot([], [], 'r-', label='Panels Warehouse')
 o, = plt.plot([], [], 'g-', label='Exported panels')
 x, = plt.plot([], [], 'y-', label='Steel Fabrication Hall')
 y, = plt.plot([], [], 'b-', label='Panels Fabrication Hall')
+r, = plt.plot([], [], 'mo', label='Forklifts in use')
+t, = plt.plot([], [], 'mo', label='Forklifts queue')
 plt.legend(loc='upper left')
 metadata=dict(title='Movie', artist='Panos')
 writer = PillowWriter(fps=15, metadata=metadata)
 
-
+dfdata = pd.DataFrame(data, columns=['Time', 'Steel Warehouse', 'Panels Warehouse', 'Exported panels', 'Steel Fabrication Hall', 'Panels Fabrication Hall', 'Forklifts in use', 'Forklifts queue'])
 
 plt.xlim(0,SIMTIME)
 plt.ylim(0,100)
 output_path = os.path.join(dir_path, 'animation.gif')
 with writer.saving(fig, output_path, 100):
-    for i in range(len(xlist)):
-        l.set_data(xlist[0:i], ylist1[0:i])
-        m.set_data(xlist[0:i], ylist2[0:i])
-        o.set_data(xlist[0:i], expopanels[0:i])
-        x.set_data(xlist[0:i], ylist3[0:i])
-        y.set_data(xlist[0:i], ylist4[0:i])           
+    for i in range(len(data)):
+        l.set_data(dfdata.loc[0:i, 'Time'], dfdata.loc[0:i,'Steel Warehouse'])
+        m.set_data(dfdata.loc[0:i, 'Time'], dfdata.loc[0:i,'Panels Warehouse'])
+        o.set_data(dfdata.loc[0:i, 'Time'], dfdata.loc[0:i,'Exported panels'])
+        x.set_data(dfdata.loc[0:i, 'Time'], dfdata.loc[0:i,'Steel Fabrication Hall'])
+        y.set_data(dfdata.loc[0:i, 'Time'], dfdata.loc[0:i,'Panels Fabrication Hall'])
+        r.set_data(dfdata.loc[0:i, 'Time'], dfdata.loc[0:i,'Forklifts in use'])
+        t.set_data(dfdata.loc[0:i, 'Time'], dfdata.loc[0:i,'Forklifts queue'])
+      
         writer.grab_frame()     
 
