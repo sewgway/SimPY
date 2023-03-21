@@ -9,21 +9,23 @@ worker_panel = 3
 initial_steel  = 0
 panel_capacity = 40
 steel_capacity = 1000
+forklift_capacity = 5
 
 class ForkliftGarage:
-    forklift_capacity = 5
     def __init__(self,env, forklift_capacity):
         self.forklifts = simpy.Resource(env,capacity=forklift_capacity)
         self.carrying_capacity = 2
         self.trans_time = 4
-    def transport(self, resource, src, tgt, amount):
+    def transport(self, mat, src, tgt, amount):
+        material = getattr(src,mat)
+        material2 = getattr(tgt, mat)
         while amount > 0:
             if amount > self.carrying_capacity:
                 load = self.carrying_capacity
             else:
                 load = amount
-            yield src.resource.get(load)
-            yield tgt.resource.put(load)
+            yield material.get(load)
+            yield material2.put(load)
             yield env.timeout(self.trans_time)
             amount += - load
 
@@ -58,11 +60,8 @@ class ImportExport_warehouse:
             if self.panels.level >= panel_capacity*0.7:
                 print('[Warehouse] Export panels')
                 yield env.timeout(4)
-                # with ForkliftGarage.forklifts.request() as request:
-                #     yield request
-                #     yield env.process(ForkliftGarage.transport(ForkliftGarage, 'steel', self, ))
-                yield self.panels.get(10)
-                self.exported_panels += 1
+                self.exported_panels += self.panels.level
+                yield ImportExport_warehouse.panels.get(self.panels.level)
                 print("Exported panels so far are: %d" %self.exported_panels)
                 yield env.timeout(8)
             else:
@@ -82,10 +81,9 @@ class FabricationHall:
         while True:
             if self.steel.level < 30:
                 print('[Fabrication] Need to import steel. Asking from warehouse')
-                yield env.timeout(2)
-                yield ImportExport_warehouse.steel.get(10)
-
-                yield self.steel.put(10)
+                with ForkliftGarage.forklifts.request() as request:
+                    yield request
+                    yield env.process(ForkliftGarage.transport('steel', ImportExport_warehouse, self, 10))
                 print('[Fabrication] Steel arrived from warehouse')
                 print('[Fabrication] New steel stock is %d' %self.steel.level)
             else:
@@ -97,9 +95,9 @@ class FabricationHall:
             if self.panels.level >= 4:
                 print('[Fabrication] Export panels to warehouse')
                 amount_to_be_transferred = self.panels.level
-                yield self.panels.get(amount_to_be_transferred)
-                yield ImportExport_warehouse.panels.put(amount_to_be_transferred)
-                yield env.timeout(2)
+                with ForkliftGarage.forklifts.request() as request:
+                    yield request
+                    yield env.process(ForkliftGarage.transport('panels', self, ImportExport_warehouse, amount_to_be_transferred))
             else:
                 yield env.timeout(1)
 
@@ -120,12 +118,16 @@ def clock(env,A, B):
             xlist.append(env.now)
             ylist1.append(A.steel.level)
             ylist2.append(A.panels.level)
+            ylist3.append(B.steel.level)
+            ylist4.append(B.panels.level)
             expopanels.append(A.exported_panels)
-            print('Steel %d' %A.steel.level)      
-            yield env.timeout(2)
+            # print('Steel %d' %A.steel.level)      
+            yield env.timeout(1)
 
 ylist1=[]
 ylist2=[]
+ylist3=[]
+ylist4=[]
 expopanels=[]
 xlist=[]
 
@@ -134,16 +136,21 @@ env=simpy.Environment()
 
 ImportExport_warehouse = ImportExport_warehouse(env)
 FabricationHall = FabricationHall(env)
+ForkliftGarage = ForkliftGarage(env, forklift_capacity)
 env.process(clock(env, ImportExport_warehouse, FabricationHall))
 
-SIMTIME=500
+SIMTIME=1000
+
 
 env.run(until=SIMTIME)
+print('Finished with Simulation')
 fig = plt.figure()
 
-l, = plt.plot([], [], 'k-', label='Steel')
-m, = plt.plot([], [], 'r-', label='Panels')
+l, = plt.plot([], [], 'k-', label='Steel Warehouse')
+m, = plt.plot([], [], 'r-', label='Panels Warehouse')
 o, = plt.plot([], [], 'g-', label='Exported panels')
+x, = plt.plot([], [], 'y-', label='Steel Fabrication Hall')
+y, = plt.plot([], [], 'b-', label='Panels Fabrication Hall')
 plt.legend(loc='upper left')
 metadata=dict(title='Movie', artist='Panos')
 writer = PillowWriter(fps=15, metadata=metadata)
@@ -158,5 +165,7 @@ with writer.saving(fig, output_path, 100):
         l.set_data(xlist[0:i], ylist1[0:i])
         m.set_data(xlist[0:i], ylist2[0:i])
         o.set_data(xlist[0:i], expopanels[0:i])
+        x.set_data(xlist[0:i], ylist3[0:i])
+        y.set_data(xlist[0:i], ylist4[0:i])           
         writer.grab_frame()     
 
